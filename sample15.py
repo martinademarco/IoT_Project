@@ -11,6 +11,8 @@ appname = "IOT - sample1"
 app = Flask(appname)
 myconfig = Config
 app.config.from_object(myconfig)
+client = InfluxDBClient(host='localhost', port=8086)
+client.switch_database('sensors') 
 
 SWAGGER_URL = '/api/docs'  # URL for exposing Swagger UI (without trailing '/')
 API_URL = '/spec'  # Our API url (can of course be a local resource)
@@ -42,8 +44,8 @@ def stampalista(sensor):
     temperatures = [point['value'] for point in points]
     return jsonify(temperatures)
 
-@app.route('/addinlista', methods=['POST'])
-def addinlista():
+@app.route('/addinlista/<sensor>/<value>', methods=['POST'])
+def addinlista(sensor, value):
     """
     Add element to the list
     ---
@@ -60,15 +62,14 @@ def addinlista():
       200:
         description: List
     """
-    json_data = request.get_json()
     json_body = [
         {
             "measurement": "temperature",
             "tags": {
-                "sensor": json_data["sensor"]
+                "sensor": sensor
             },
             "fields": {
-                "value": json_data["value"]
+                "value": value
             }
         }
     ]
@@ -87,9 +88,6 @@ def spec():
 if __name__ == '__main__':
     port = 80
     interface = '0.0.0.0'
-    client = InfluxDBClient(host='localhost', port=8086)
-    client.switch_database('sensors')   
-    
     
     # Call factory function to create our blueprint
     swaggerui_blueprint = get_swaggerui_blueprint(
@@ -99,6 +97,5 @@ if __name__ == '__main__':
             'app_name': "Test application"
         }
     )
-
     app.register_blueprint(swaggerui_blueprint)
     app.run(host=interface,port=port)
