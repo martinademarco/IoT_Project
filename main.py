@@ -15,7 +15,6 @@ bucket = 'IoT_Project'
 client = influxdb_client.InfluxDBClient(url=url,
    token=token,
    org=org)
-write_api = client.write_api(write_options=SYNCHRONOUS)
 
 SWAGGER_URL = '/api/docs'  # URL for exposing Swagger UI (without trailing '/')
 API_URL = '/spec'  # Our API url (can of course be a local resource)
@@ -68,12 +67,13 @@ def addinlista(sensor, value):
           required: true
         - in: path
           name: value
-          description: float
+          description: integer
           required: true
     responses:
       200:
         description: List
     """
+    write_api = client.write_api(write_options=SYNCHRONOUS)
     measure = influxdb_client.Point("new_measurement").tag("sensor", sensor).field("value", int(value))
     write_api.write(bucket=bucket, org=org, record=measure)
     return "Data added"
