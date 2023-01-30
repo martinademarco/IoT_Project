@@ -1,18 +1,21 @@
 from flask import Flask
-from flask import request
-from config import Config
 from flask import render_template
 from flask_swagger import swagger
 from flask import jsonify
 from flask_swagger_ui import get_swaggerui_blueprint
-from influxdb import InfluxDBClient
+import influxdb_client
+from influxdb_client.client.write_api import SYNCHRONOUS
 
 appname = "IOT - sample1"
 app = Flask(appname)
-myconfig = Config
-app.config.from_object(myconfig)
-client = InfluxDBClient(host='localhost', port=8086)
-client.switch_database('sensors') 
+url = 'http://localhost:8086'
+token = 'jeNhl3BOgS7G9-1RP0F3i9BwjAFOP1VB4WA4H9FQgmOjZjJBauIL-XsKos-xNOb620x3PgN5xQv8JOUA44TeGg=='
+org = 'IoT_Project'
+bucket = 'IoT_Project'
+client = influxdb_client.InfluxDBClient(url=url,
+   token=token,
+   org=org)
+write_api = client.write_api(write_options=SYNCHRONOUS)
 
 SWAGGER_URL = '/api/docs'  # URL for exposing Swagger UI (without trailing '/')
 API_URL = '/spec'  # Our API url (can of course be a local resource)
@@ -23,7 +26,6 @@ def page_not_found(error):
 
 @app.route('/')
 def testoHTML():
-    # db.create_all()
     return render_template('main.html')
 
 
@@ -32,17 +34,27 @@ def stampalista(sensor):
     """
     Print the list
     ---
- 
+    parameters:
+        - in: path
+          name: sensor
+          description: arg
+          required: true
     responses:
       200:
         description: List
     """
-    # elenco=Sensorfeed.query.order_by(Sensorfeed.id.asc()).all()
-    # return render_template('lista3.html', lista=elenco)
-    result = client.query("SELECT value FROM temperature WHERE sensor = '{}'".format(sensor))
-    points = result.get_points()
-    temperatures = [point['value'] for point in points]
-    return jsonify(temperatures)
+    query_api = client.query_api()
+    query = f'from(bucket:"{bucket}")\
+    |> range(start: -1h)\
+    |> filter(fn:(r) => r._measurement == "new_measurement")\
+    |> filter(fn:(r) => r.sensor == "{sensor}")\
+    |> filter(fn:(r) => r._field == "value")'
+    result = query_api.query(org=org, query=query)
+    results = []
+    for table in result:
+        for record in table.records:
+            results.append((record.get_value(), record.get_time()))
+    return render_template('lista3.html', lista=results)
 
 @app.route('/addinlista/<sensor>/<value>', methods=['POST'])
 def addinlista(sensor, value):
@@ -56,24 +68,14 @@ def addinlista(sensor, value):
           required: true
         - in: path
           name: value
-          description: integer
+          description: float
           required: true
     responses:
       200:
         description: List
     """
-    json_body = [
-        {
-            "measurement": "temperature",
-            "tags": {
-                "sensor": sensor
-            },
-            "fields": {
-                "value": value
-            }
-        }
-    ]
-    client.write_points(json_body)
+    measure = influxdb_client.Point("new_measurement").tag("sensor", sensor).field("value", int(value))
+    write_api.write(bucket=bucket, org=org, record=measure)
     return "Data added"
     
 
