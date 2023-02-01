@@ -5,6 +5,7 @@ from flask import jsonify
 from flask_swagger_ui import get_swaggerui_blueprint
 import influxdb_client
 from influxdb_client.client.write_api import SYNCHRONOUS
+from bridge_HTTP_Serial import Bridge
 
 appname = "IOT - sample1"
 app = Flask(appname)
@@ -25,6 +26,8 @@ def page_not_found(error):
 
 @app.route('/')
 def testoHTML():
+    br=Bridge()
+    br.postdata(0,17)
     return render_template('main.html')
 
 
@@ -55,7 +58,7 @@ def stampalista(sensor):
             results.append((record.get_value(), record.get_time()))
     return render_template('lista3.html', lista=results)
 
-@app.route('/addinlista/<sensor>/<value>', methods=['POST'])
+@app.route('/newdata/<sensor>/<value>', methods=['POST']) # considera di passare un file JSON
 def addinlista(sensor, value):
     """
     Add element to the list
