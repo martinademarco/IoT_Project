@@ -26,8 +26,6 @@ def page_not_found(error):
 
 @app.route('/')
 def testoHTML():
-    br=Bridge()
-    br.postdata(0,17)
     return render_template('main.html')
 
 
