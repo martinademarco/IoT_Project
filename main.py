@@ -5,27 +5,7 @@ from flask import jsonify
 from flask_swagger_ui import get_swaggerui_blueprint
 import influxdb_client
 from influxdb_client.client.write_api import SYNCHRONOUS
-import paho.mqtt.client as mqtt
 import configparser
-import requests
-
-def on_connect(clientMQTT, userdata, flags, rc):
-        #print("Connected with result code " + str(rc))
-
-        # Subscribing in on_connect() means that if we lose the connection and
-        # reconnect then subscriptions will be renewed.
-        clientMQTT.subscribe("Tsensor_0")
-        clientMQTT.subscribe("LvLsensor_0")
-        clientMQTT.subscribe("LvLsensor_1")
-
-def on_message(clientMQTT, userdata, msg):
-    print(msg.topic + " " + str(msg.payload))
-    url = config.get("HTTP","Url") + "/newdata" + f"/{msg.topic}" + f"/{msg.payload.decode()}"
-    try:
-        requests.post(url)
-    except requests.exceptions.RequestException as e:
-        raise SystemExit(e)
-
 
 appname = "IOT - sample1"
 app = Flask(appname)
@@ -109,17 +89,6 @@ def spec():
 if __name__ == '__main__':
     port = 80
     interface = '0.0.0.0'
-
-    clientMQTT = mqtt.Client()
-    clientMQTT.on_connect = on_connect
-    clientMQTT.on_message = on_message
-    print("connecting to MQTT broker...")
-    clientMQTT.connect(
-        config.get("MQTT","Server", fallback= "broker.hivemq.com"),
-        config.getint("MQTT","Port", fallback= 1883),
-        60)
-
-    clientMQTT.loop_start()
     
     # Call factory function to create our blueprint
     swaggerui_blueprint = get_swaggerui_blueprint(

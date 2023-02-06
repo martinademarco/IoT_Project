@@ -4,7 +4,7 @@ import serial
 import serial.tools.list_ports
 
 import configparser
-
+import requests
 import paho.mqtt.client as mqtt
 
 class Bridge():
@@ -71,10 +71,15 @@ class Bridge():
 	# The callback for when a PUBLISH message is received from the server.
 	def on_message(self, client, userdata, msg):
 		print(msg.topic + " " + str(msg.payload))
-		if float(msg.payload)>100:
+		url = self.config.get("HTTP","Url") + "/newdata" + f"/{msg.topic}" + f"/{msg.payload.decode()}"
+		try:
+			requests.post(url)
+		except requests.exceptions.RequestException as e:
+			raise SystemExit(e)
+		'''if float(msg.payload)>100:
 			self.ser.write (b'A')
 		else:
-			self.ser.write(b'S')
+			self.ser.write(b'S')'''
 
 
 
