@@ -1,5 +1,3 @@
-### author: Roberto Vezzani
-
 import serial
 import serial.tools.list_ports
 
@@ -67,21 +65,30 @@ class Bridge():
 		self.clientMQTT.subscribe("LvLsensor_0")
 		self.clientMQTT.subscribe("LvLsensor_1")
 
-
 	# The callback for when a PUBLISH message is received from the server.
 	def on_message(self, client, userdata, msg):
 		print(msg.topic + " " + str(msg.payload))
+		match msg.topic:
+			case "LvLsensor_0":
+				if float(msg.payload.decode())<15:
+					self.ser.write (b'A0')
+				else:
+					self.ser.write(b'S0')
+			case "Tsensor_0":
+				if float(msg.payload.decode())>15:
+					self.ser.write (b'A1')
+				else:
+					self.ser.write(b'S1')
+			case "LvLsensor_1":
+				if float(msg.payload.decode())<12:
+					self.ser.write (b'A2')
+				else:
+					self.ser.write(b'S2')
 		url = self.config.get("HTTP","Url") + "/newdata" + f"/{msg.topic}" + f"/{msg.payload.decode()}"
 		try:
 			requests.post(url)
 		except requests.exceptions.RequestException as e:
 			raise SystemExit(e)
-		'''if float(msg.payload)>100:
-			self.ser.write (b'A')
-		else:
-			self.ser.write(b'S')'''
-
-
 
 	def loop(self):
 		# infinite loop for serial managing
@@ -105,7 +112,7 @@ class Bridge():
 	def useData(self):
 		print(self.inbuffer)
 		# I have received a packet from the serial port. I can use it
-		if len(self.inbuffer)<3:   # at least header, size, footer
+		if len(self.inbuffer)<5:   # at least header, size, data, sensor, footer
 			return False
 		# split parts
 
