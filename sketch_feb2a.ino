@@ -1,10 +1,33 @@
 unsigned long previousMillis = 0;
 const int interval = 10000;
 int currentstate;
+bool config = true;
 
-int count_digit(int number) {
-   return int(log10(number * 100) + 2); // per inviare anche numeri decimali
+int countDigits(float number) {
+  int digitCount = 0;
+  
+  // Conta le cifre della parte intera
+  int integerPart = (int)number;
+  while (integerPart > 0) {
+    digitCount++;
+    integerPart /= 10;
+  }
+  
+  // Conta le cifre della parte frazionaria
+  float fractionalPart = number - integerPart;
+  if (fractionalPart > 0) {
+    digitCount++;  // Conta la virgola decimale
+    while (fractionalPart > 0) {
+      digitCount++;
+      fractionalPart *= 10;
+      fractionalPart = fractionalPart - (int)fractionalPart;
+    }
+    digitCount++;
+  }
+  
+  return digitCount;
 }
+
 
 void setup() {
   // put your setup code here, to run once:
@@ -18,17 +41,30 @@ void setup() {
 
 void loop() {
   // put your main code here, to run repeatedly:
+  char SoL = '\xff';
+  char EoL = '\xfe';
+  while (config) {
+    if (Serial.available() > 0){
+      char start = Serial.read();
+      if (start == SoL){
+        Serial.print(EoL); //connessione al bridge
+        char id[] = "001";
+        int id_size = strlen(id);
+        Serial.print(id_size);
+        Serial.print(id);
+        config = false;
+      }       
+    }
+  }
   unsigned long currentMillis = millis();
   if (currentMillis - previousMillis >= interval) {
     previousMillis = currentMillis;
-    char SoL = '\xff';
     Serial.print(SoL);
     float randomValue = random(12, 22);
-    int pack_size = count_digit(randomValue);
+    int pack_size = countDigits(randomValue);
     Serial.print(pack_size);
     Serial.print(randomValue);
-    Serial.print("Tsensor_0");
-    char EoL = '\xfe';
+    Serial.print("001Tsensor_0");
     Serial.print(EoL);    
   }
   if(Serial.available() > 0){
