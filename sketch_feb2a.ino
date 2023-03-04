@@ -48,8 +48,12 @@ void loop() {
       char start = Serial.read();
       if (start == SoL){
         Serial.print(EoL); //connessione al bridge
+        char zona = "zona_1";
+        int zona_size = strlen(zona);
         char id[] = "001";
         int id_size = strlen(id);
+        Serial.print(zona_size);
+        Serial.print(zona);
         Serial.print(id_size);
         Serial.print(id);
         config = false;
@@ -64,7 +68,7 @@ void loop() {
     int pack_size = countDigits(randomValue);
     Serial.print(pack_size);
     Serial.print(randomValue);
-    Serial.print("001Tsensor_0");
+    Serial.print("Tsensor_0");
     Serial.print(EoL);    
   }
   if(Serial.available() > 0){

@@ -1,4 +1,7 @@
 from serialPort import Seriale
+import serial
+import serial.tools.list_ports
+import socket
 
 import configparser
 import requests
@@ -10,13 +13,7 @@ class Bridge():
 	def __init__(self):
 		self.config = configparser.ConfigParser()
 		self.config.read('config.ini')
-		self.seriale = Seriale()
-		self.bufferlist = {}
-		self.device = []
-		'''for i in [*self.seriale.ports]:
-			self.setupMQTT()
-			self.bufferlist[i] = []
-		self.device = [*self.seriale.ports]'''
+		self.arduino = []
 
 	def setupMQTT(self):
 		self.clientMQTT = mqtt.Client()
@@ -35,13 +32,10 @@ class Bridge():
 
 		# Subscribing in on_connect() means that if we lose the connection and
 		# reconnect then subscriptions will be renewed.
-		key = [*self.seriale.ports]
-		count = self.diffList(key)
-		for index in count:
-			self.clientMQTT.subscribe(index + "Tsensor_0")
-			self.clientMQTT.subscribe(index + "LvLsensor_0")
-			self.clientMQTT.subscribe(index + "LvLsensor_1")
-		self.device = [*self.seriale.ports]
+		arduino = self.arduino[-1]
+		self.clientMQTT.subscribe(arduino.zona + '/' + arduino.id + '/' + "Tsensor_0")
+		self.clientMQTT.subscribe(arduino.zona + '/' + arduino.id + '/' + "LvLsensor_0")
+		self.clientMQTT.subscribe(arduino.zona + '/' + arduino.id + '/' + "LvLsensor_1")
 
     # The callback for when a PUBLISH message is received from the server.
 	def on_message(self, client, userdata, msg):
@@ -62,7 +56,9 @@ class Bridge():
 						self.seriale.ports[port].write(b'A2')
 				else:
 					self.seriale.ports[port].write(b'S2')
-		url = self.config.get("HTTP","Url") + "/newdata" + f"/{msg.topic}" + f"/{msg.payload.decode()}"
+		hostname = socket.gethostname()    
+		IPAddr = socket.gethostbyname(hostname)
+		url = IPAddr + "/newdata" + f"/{msg.topic}" + f"/{msg.payload.decode()}"
 		try:
 			requests.post(url)
 		except requests.exceptions.RequestException as e:
@@ -73,7 +69,8 @@ class Bridge():
 		#
 		while (True):
 			#look for a byte from serial
-			for key,port in self.seriale.ports.items():
+			for arduino in self.arduino:
+				port = arduino.ser
 				if port.isOpen():
 					if port.in_waiting>0:
 						# data available from the serial port
@@ -81,27 +78,19 @@ class Bridge():
 
 						if lastchar==b'\xfe': #EOL
 							print("\nValue received")
-							self.useData(self.bufferlist[key])
-							self.bufferlist[key] =[]
+							self.useData(arduino)
+							arduino.buffer = []
 						else:
 							# append
-							self.bufferlist[key].append(lastchar)
+							arduino.buffer.append(lastchar)
 				else:
-					self.seriale.ports.pop(key)
-					self.device.remove(key)
-					self.bufferlist.pop(key)
+					self.arduino.remove(arduino)
 					print(port + " è stata rimossa")
-			self.seriale.checkConnection()
-			key = [*self.seriale.ports]
-			if self.device != key:
-				count = self.diffList(key)
-				for j in count:
-					self.setupMQTT()
-					self.bufferlist[j] = []
-				time.sleep(1)
+			self.checkConnection()
 				
 
-	def useData(self, inbuffer):
+	def useData(self, arduino):
+		inbuffer = arduino.buffer
 		print(inbuffer)
 		# I have received a packet from the serial port. I can use it
 
@@ -117,14 +106,18 @@ class Bridge():
 		sensorLen = len(inbuffer) - (SoN)
 		for j in range (sensorLen):
 			sensor_name = sensor_name + str(inbuffer[j + SoN].decode())
-		self.clientMQTT.publish(sensor_name, val)
-
-	def diffList(self, li2):
-		temp3 = []
-		for element in li2:
-			if element not in self.device:
-				temp3.append(element)
-		return temp3
+		self.clientMQTT.publish(arduino.zona + '/' + arduino.id + '/' + sensor_name, val)
+	
+	def checkConnection(self):
+		ports = serial.tools.list_ports.comports()
+		for port in ports:
+			if 'Arduino Uno' in port.description:
+				if port.device not in self.arduino.portName: # valutare se funziona sennò ciclo for
+					seriale = Seriale()
+					if seriale.setupSerial(port):
+						self.arduino.append(seriale)
+						self.setupMQTT()
+						time.sleep(1) # controlla se funziona anche senza
 
 if __name__ == '__main__':
 	br = Bridge()
