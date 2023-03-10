@@ -1,4 +1,3 @@
-from serialPort import Seriale
 import serial
 import serial.tools.list_ports
 import socket
@@ -10,10 +9,15 @@ import time
 
 class Bridge():
 
-	def __init__(self):
+	def __init__(self, port):
 		self.config = configparser.ConfigParser()
 		self.config.read('config.ini')
-		self.arduino = []
+		self.buffer = []
+		self.datiZona = {}
+		self.ser = None
+		self.setupSerial(port)
+		self.setupMQTT()
+
 
 	def setupMQTT(self):
 		self.clientMQTT = mqtt.Client()
@@ -32,30 +36,35 @@ class Bridge():
 
 		# Subscribing in on_connect() means that if we lose the connection and
 		# reconnect then subscriptions will be renewed.
-		arduino = self.arduino[-1]
-		self.clientMQTT.subscribe(arduino.zona + '/' + arduino.id + '/' + "Tsensor_0")
-		self.clientMQTT.subscribe(arduino.zona + '/' + arduino.id + '/' + "LvLsensor_0")
-		self.clientMQTT.subscribe(arduino.zona + '/' + arduino.id + '/' + "LvLsensor_1")
+		self.clientMQTT.subscribe(self.zona + '/' + self.id + '/' + "Tsensor_0")
+		self.clientMQTT.subscribe(self.zona + '/' + self.id + '/' + "LvLsensor_0")
+		self.clientMQTT.subscribe(self.zona + '/' + self.id + '/' + "LvLsensor_1")
+		self.clientMQTT.subscribe(self.zona + '/+/Tsensor_0')
 
     # The callback for when a PUBLISH message is received from the server.
 	def on_message(self, client, userdata, msg):
 		print(msg.topic + " " + str(msg.payload))
-		for port in self.seriale.ports.keys():
-			if msg.topic == port + "LvLsensor_0":
-				if float(msg.payload.decode())<15:
-						self.seriale.ports[port].write(b'A0')
-				else:
-					self.seriale.ports[port].write(b'S0')
-			elif msg.topic == port + "Tsensor_0":
-				if float(msg.payload.decode())>15:
-						self.seriale.ports[port].write(b'A1')
-				else:
-					self.seriale.ports[port].write(b'S1')
-			elif msg.topic == port + "LvLsensor_1":
-				if float(msg.payload.decode())<15:
-						self.seriale.ports[port].write(b'A2')
-				else:
-					self.seriale.ports[port].write(b'S2')
+		if msg.topic == self.zona + '/' + self.id + '/' + "LvLsensor_0":
+			if float(msg.payload.decode())<15:
+					self.ser.write(b'A0')
+			else:
+				self.ser.write(b'S0')
+		elif msg.topic == self.zona + '/' + self.id + '/' + "Tsensor_0":
+			dati = list(self.datiZona.values())
+			media = sum(dati) / len(dati)
+			if float(msg.payload.decode())>media + 3:
+					self.ser.write(b'A1')
+			else:
+				self.ser.write(b'S1')
+		elif msg.topic == self.zona + '/' + self.id + '/' + "LvLsensor_1":
+			if float(msg.payload.decode())<15:
+					self.ser.write(b'A2')
+			else:
+				self.ser.write(b'S2')
+		elif msg.topic == self.zona + '/+/Tsensor_0':
+			string = msg.payload.decode()
+			id, temperatura = string.strip(',')
+			self.datiZona[id] = temperatura
 		hostname = socket.gethostname()    
 		IPAddr = socket.gethostbyname(hostname)
 		url = IPAddr + "/newdata" + f"/{msg.topic}" + f"/{msg.payload.decode()}"
@@ -64,61 +73,63 @@ class Bridge():
 		except requests.exceptions.RequestException as e:
 			raise SystemExit(e)
 
-	def loop(self):
-		# infinite loop for serial managing
-		#
-		while (True):
-			#look for a byte from serial
-			for arduino in self.arduino:
-				port = arduino.ser
-				if port.isOpen():
-					if port.in_waiting>0:
-						# data available from the serial port
-						lastchar=port.read(1)
+	def readData(self):
+		#look for a byte from serial
+		if self.ser.in_waiting>0:
+			# data available from the serial port
+			lastchar=self.ser.read(1)
 
-						if lastchar==b'\xfe': #EOL
-							print("\nValue received")
-							self.useData(arduino)
-							arduino.buffer = []
-						else:
-							# append
-							arduino.buffer.append(lastchar)
-				else:
-					self.arduino.remove(arduino)
-					print(port + " è stata rimossa")
-			self.checkConnection()
-				
+			if lastchar==b'\xfe': #EOL
+				print("\nValue received")
+				self.useData()
+				self.buffer = []
+			else:
+				# append
+				self.buffer.append(lastchar)
 
-	def useData(self, arduino):
-		inbuffer = arduino.buffer
-		print(inbuffer)
+	def useData(self):
+		print(self.buffer)
 		# I have received a packet from the serial port. I can use it
 
-		if inbuffer[0] != b'\xff':
+		if self.buffer[0] != b'\xff':
 			print('Pacchetto errato')
 			return False
-		numval = int(inbuffer[1].decode()) # legge size del pacchetto
+		numval = int(self.buffer[1].decode()) # legge size del pacchetto
 		val = ''
 		for i in range (numval):
-			val = val + inbuffer[i+2].decode() # legge valore del pacchetto
+			val = val + self.buffer[i+2].decode() # legge valore del pacchetto
 		sensor_name = ''
 		SoN = numval + 2
-		sensorLen = len(inbuffer) - (SoN)
+		sensorLen = len(self.buffer) - (SoN)
 		for j in range (sensorLen):
-			sensor_name = sensor_name + str(inbuffer[j + SoN].decode())
-		self.clientMQTT.publish(arduino.zona + '/' + arduino.id + '/' + sensor_name, val)
-	
-	def checkConnection(self):
-		ports = serial.tools.list_ports.comports()
-		for port in ports:
-			if 'Arduino Uno' in port.description:
-				if port.device not in self.arduino.portName: # valutare se funziona sennò ciclo for
-					seriale = Seriale()
-					if seriale.setupSerial(port):
-						self.arduino.append(seriale)
-						self.setupMQTT()
-						time.sleep(1) # controlla se funziona anche senza
+			sensor_name = sensor_name + str(self.buffer[j + SoN].decode())
+		self.clientMQTT.publish(self.zona + '/' + self.id + '/' + sensor_name, val)
+		if sensor_name == 'TSensor_0':
+			self.clientMQTT.publish(self.zona + '/+/' + sensor_name, self.id + ',' + str(val))
 
-if __name__ == '__main__':
-	br = Bridge()
-	br.loop()
+	def setupSerial(self, port):        
+		try:
+			# apre la porta seriale
+			self.ser = serial.Serial(port.device, 9600, timeout=2)
+			time.sleep(2)
+			# scrive un messaggio sull'self
+			self.ser.write(b'\xff')
+			# legge la risposta dell'self
+			response = self.ser.read()
+			# verifica se l'self ha risposto correttamente
+			if response == b'\xfe':
+				print(f"self connesso alla porta {port.device}")
+				# se l'self è stato trovato aggiungi il suo id al dizionario con il buffer associato, esci dal ciclo
+				size_zona = int(self.ser.read().decode())
+				self.zona = self.ser.read(size_zona)
+				#size_id = int(self.ser.read().decode())
+				self.id = self.ser.read(3)
+				self.portName = port.device
+				return True
+			else:
+				# se l'self non ha risposto correttamente, chiude la porta seriale
+				self.ser.close()
+				print('Errore nella connessione')
+				return False
+		except (OSError, serial.SerialException):
+			pass
