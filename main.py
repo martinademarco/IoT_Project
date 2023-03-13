@@ -1,3 +1,4 @@
+import pickle
 from flask import Flask
 from flask import render_template
 from flask_swagger import swagger
@@ -76,7 +77,25 @@ def addinlista(sensor, value):
     measure = influxdb_client.Point("new_measurement").tag("sensor", sensor).field("value", float(value))
     write_api.write(bucket=config.get("InfluxDBClient","Bucket"), org=config.get("InfluxDBClient","Org"), record=measure)
     return "Data added"
-    
+
+@app.route('/previsione/<ora>', methods=['GET'])
+def previsione(ora):
+    """
+    Makes a prediction based on an input hour
+    ---
+    parameters:
+        - in: path
+          name: ora
+          description: arg
+          required: tru
+    responses:
+      200:
+        description: Int
+    """
+    with open('regressor.pickle', 'rb') as f:
+        regressor = pickle.load(f)
+        y_pred = regressor.predict(ora)
+        return y_pred
 
 @app.route("/spec")
 def spec():
