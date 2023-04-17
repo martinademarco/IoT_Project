@@ -15,8 +15,40 @@ class Bridge():
 		self.buffer = []
 		self.datiZona = {}
 		self.ser = None
+		self.port = port
 		self.setupSerial(port)
 		self.setupMQTT()
+ 
+  
+	def setupSerial(self, port):        
+		try:
+			# apre la porta seriale
+			self.ser = serial.Serial(port.device, 9600, timeout=2)
+			time.sleep(2)
+			# scrive un messaggio sull'self
+			self.ser.write(b'\xff')
+			# legge la risposta dell'self
+			response = self.ser.read()
+			# verifica se l'self ha risposto correttamente
+			if response == b'\xfe':
+				print(f"Arduino connesso alla porta {port.device}")
+				# se l'self è stato trovato aggiungi il suo id al dizionario con il buffer associato, esci dal ciclo
+				size_zona = int(self.ser.read().decode())
+				self.zona = self.ser.read(size_zona).decode()
+				#size_id = int(self.ser.read().decode())
+				self.id = self.ser.read(3).decode()
+				print(self.zona, self.id)
+				self.portName = port.device
+				return True
+			else:
+				error = self.ser.read(27)
+				print(error)
+				# se l'self non ha risposto correttamente, chiude la porta seriale
+				self.ser.close()
+				print('Errore nella connessione')
+				return False
+		except (OSError, serial.SerialException):
+			pass
 
 
 	def setupMQTT(self):
@@ -61,10 +93,11 @@ class Bridge():
 					self.ser.write(b'A2')
 			else:
 				self.ser.write(b'S2')
-		elif msg.topic == self.zona + '/+/Tsensor_0':
-			string = msg.payload.decode()
-			id, temperatura = string.strip(',')
-			self.datiZona[id] = temperatura
+		elif 'Tsensor_0' in msg.topic:
+			value = msg.payload.decode()
+			zona, id, name = msg.topic.split('/')
+			if self.id != id:
+				self.datiZona[id] = value
 		hostname = socket.gethostname()    
 		IPAddr = socket.gethostbyname(hostname)
 		url = IPAddr + "/newdata" + f"/{msg.topic}" + f"/{msg.payload.decode()}"
@@ -75,10 +108,9 @@ class Bridge():
 
 	def readData(self):
 		#look for a byte from serial
-		if self.ser.in_waiting>0:
+		while self.ser.in_waiting>0:
 			# data available from the serial port
 			lastchar=self.ser.read(1)
-
 			if lastchar==b'\xfe': #EOL
 				print("\nValue received")
 				self.useData()
@@ -97,39 +129,14 @@ class Bridge():
 		numval = int(self.buffer[1].decode()) # legge size del pacchetto
 		val = ''
 		for i in range (numval):
+			if numval - i == 2:
+				val = val + '.'
 			val = val + self.buffer[i+2].decode() # legge valore del pacchetto
+		#print(val)
 		sensor_name = ''
 		SoN = numval + 2
 		sensorLen = len(self.buffer) - (SoN)
 		for j in range (sensorLen):
 			sensor_name = sensor_name + str(self.buffer[j + SoN].decode())
 		self.clientMQTT.publish(self.zona + '/' + self.id + '/' + sensor_name, val)
-		if sensor_name == 'TSensor_0':
-			self.clientMQTT.publish(self.zona + '/+/' + sensor_name, self.id + ',' + str(val))
-
-	def setupSerial(self, port):        
-		try:
-			# apre la porta seriale
-			self.ser = serial.Serial(port.device, 9600, timeout=2)
-			time.sleep(2)
-			# scrive un messaggio sull'self
-			self.ser.write(b'\xff')
-			# legge la risposta dell'self
-			response = self.ser.read()
-			# verifica se l'self ha risposto correttamente
-			if response == b'\xfe':
-				print(f"self connesso alla porta {port.device}")
-				# se l'self è stato trovato aggiungi il suo id al dizionario con il buffer associato, esci dal ciclo
-				size_zona = int(self.ser.read().decode())
-				self.zona = self.ser.read(size_zona)
-				#size_id = int(self.ser.read().decode())
-				self.id = self.ser.read(3)
-				self.portName = port.device
-				return True
-			else:
-				# se l'self non ha risposto correttamente, chiude la porta seriale
-				self.ser.close()
-				print('Errore nella connessione')
-				return False
-		except (OSError, serial.SerialException):
-			pass
+		self.clientMQTT.on_message

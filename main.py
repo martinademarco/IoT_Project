@@ -1,12 +1,16 @@
+import datetime
 import pickle
 from flask import Flask
 from flask import render_template
 from flask_swagger import swagger
 from flask import jsonify
 from flask_swagger_ui import get_swaggerui_blueprint
+import holidays
 import influxdb_client
 from influxdb_client.client.write_api import SYNCHRONOUS
 import configparser
+
+import requests
 
 appname = "IOT - sample1"
 app = Flask(appname)
@@ -79,7 +83,7 @@ def addinlista(sensor, value):
     return "Data added"
 
 @app.route('/previsione/<ora>', methods=['GET'])
-def previsione(ora):
+def previsione(ora, lat=44.64, lon=10.92):
     """
     Makes a prediction based on an input hour
     ---
@@ -87,15 +91,61 @@ def previsione(ora):
         - in: path
           name: ora
           description: arg
-          required: tru
+          required: true
+        - in: path
+          name: lat
+          description: float
+          required: false
+        - in: path
+          name: lon
+          description: float
+          required: false
     responses:
       200:
         description: Int
     """
+    # lat e lon di default sono quelle di MODENA
     with open('regressor.pickle', 'rb') as f:
         regressor = pickle.load(f)
-        y_pred = regressor.predict(ora)
-        return y_pred
+
+        # Ottieni l'ora corrente
+        now = datetime.datetime.now()
+
+        # Ottieni le condizioni meteorologiche correnti da un API meteo
+        api_key = '7709f02753c2a737ab142230c07b181d'
+        url = f'https://api.openweathermap.org/data/2.5/weather?lat={lat}&lon={lon}&appid={api_key}'
+        response = requests.get(url)
+        weather_data = response.json()
+        season = ...  # Ottieni la stagione in base al mese corrente
+        yr = now.year - 2011  # 0 per il 2011, 1 per il 2012
+        mnth = now.month
+        hr = now.hour
+        # Crea un oggetto "Italy" che rappresenta le festività italiane
+        it_holidays = holidays.IT()
+
+        # Verifica se il 25 aprile 2023 è una festività in Italia
+        if datetime.date(2023, 4, 25) in it_holidays:
+            holiday = 1
+        else:
+            holiday = 0
+        holiday = ...  # Verifica se oggi è una festività
+        weekday = now.weekday()
+        # Verifica se oggi è un giorno lavorativo
+        if weekday() < 5:  # 5 corrisponde a sabato, 6 a domenica
+            workingday = 0
+        else:
+            workingday = 1
+        weathersit = ...  # Ottieni il codice weathersit dalle condizioni meteorologiche
+        temp = weather_data['main']['temp'] - 273.15  # Converti da Kelvin a Celsius
+        atemp = weather_data['main']['feels_like'] - 273.15  # Converti da Kelvin a Celsius
+        hum = weather_data['main']['humidity']
+
+        # Effettua la predizione utilizzando il modello e i dati di input
+        predizione = regressor.predict([[season, yr, mnth, hr, holiday, weekday, workingday, weathersit, temp, atemp, hum]])
+
+        # Ritorna la predizione
+        return f'La previsione del numero di biciclette utilizzate alle {now} è {predizione[0]}'
+
 
 @app.route("/spec")
 def spec():

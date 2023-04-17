@@ -16,7 +16,7 @@ class Scheduler():
                     bridge.readData()
                 else:
                     self.bridges.remove(bridge)
-                    self.arduini.remove(bridge.port)
+                    self.arduini.remove(bridge.port.device)
 
     
     def checkConnection(self):
