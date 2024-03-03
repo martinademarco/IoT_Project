@@ -116,26 +116,41 @@ def previsione(ora, lat=44.64, lon=10.92):
         url = f'https://api.openweathermap.org/data/2.5/weather?lat={lat}&lon={lon}&appid={api_key}'
         response = requests.get(url)
         weather_data = response.json()
-        season = ...  # Ottieni la stagione in base al mese corrente
+        # Ottieni la stagione in base al mese corrente
+        if 3 <= now.month <= 5:
+            season = 1  # Spring
+        elif 6 <= now.month <= 8:
+            season = 2  # Summer
+        elif 9 <= now.month <= 11:
+            season = 3  # Fall
+        else:
+            season = 4  # Winter
         yr = now.year - 2011  # 0 per il 2011, 1 per il 2012
         mnth = now.month
         hr = now.hour
         # Crea un oggetto "Italy" che rappresenta le festività italiane
         it_holidays = holidays.IT()
 
-        # Verifica se il 25 aprile 2023 è una festività in Italia
-        if datetime.date(2023, 4, 25) in it_holidays:
+        # Verifica se oggi è festività in Italia
+        if datetime.date(now.year, now.month, now.day) in it_holidays:
             holiday = 1
         else:
             holiday = 0
-        holiday = ...  # Verifica se oggi è una festività
         weekday = now.weekday()
         # Verifica se oggi è un giorno lavorativo
-        if weekday() < 5:  # 5 corrisponde a sabato, 6 a domenica
+        if weekday < 5:  # 5 corrisponde a sabato, 6 a domenica
             workingday = 0
         else:
             workingday = 1
-        weathersit = ...  # Ottieni il codice weathersit dalle condizioni meteorologiche
+        # Ottieni il codice weathersit dalle condizioni meteorologiche
+        if weather_data['weather'][0]['main'] in ['Clear','Few clouds','Partly cloudy']:
+            weathersit = 1 
+        elif weather_data['weather'][0]['main'] in ['Cloudy','Mist + Broken clouds','Few clouds','Mist']:
+            weathersit = 2
+        elif weather_data['weather'][0]['main'] in ['Light Snow','Light Rain']:
+            weathersit = 3
+        else:
+            weathersit = 4
         temp = weather_data['main']['temp'] - 273.15  # Converti da Kelvin a Celsius
         atemp = weather_data['main']['feels_like'] - 273.15  # Converti da Kelvin a Celsius
         hum = weather_data['main']['humidity']
@@ -144,7 +159,7 @@ def previsione(ora, lat=44.64, lon=10.92):
         predizione = regressor.predict([[season, yr, mnth, hr, holiday, weekday, workingday, weathersit, temp, atemp, hum]])
 
         # Ritorna la predizione
-        return f'La previsione del numero di biciclette utilizzate alle {now} è {predizione[0]}'
+        return f'La previsione del numero di biciclette utilizzate alle {now} è {int(predizione[0])}'
 
 
 @app.route("/spec")

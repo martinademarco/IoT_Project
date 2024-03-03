@@ -14,8 +14,12 @@ class Bridge():
 		self.config.read('config.ini')
 		self.buffer = []
 		self.datiZona = {}
+		self.currentState = 0
 		self.ser = None
 		self.port = port
+		# valori di soglia per le temperature
+		self.sogliaMax = 35
+		self.sogliaMin = 10
 		self.setupSerial(port)
 		self.setupMQTT()
  
@@ -78,16 +82,32 @@ class Bridge():
 		print(msg.topic + " " + str(msg.payload))
 		if msg.topic == self.zona + '/' + self.id + '/' + "LvLsensor_0":
 			if float(msg.payload.decode())<15:
-					self.ser.write(b'A0')
+				self.ser.write(b'A0')
 			else:
 				self.ser.write(b'S0')
 		elif msg.topic == self.zona + '/' + self.id + '/' + "Tsensor_0":
 			dati = list(self.datiZona.values())
 			media = sum(dati) / len(dati)
-			if float(msg.payload.decode())>media + 3:
-					self.ser.write(b'A1')
-			else:
-				self.ser.write(b'S1')
+			futureState = None
+			if self.currentState == 0:
+				if float(msg.payload.decode())>media+1:
+					futureState = 1
+				elif float(msg.payload.decode())<media-5:
+					futureState = 2
+				else:
+					self.ser.write(b'S1')
+			elif self.currentState == 1:
+				if float(msg.payload.decode())>self.sogliaMax:
+					futureState = 3
+				else: futureState = 0
+			elif self.currentState == 2:
+				if float(msg.payload.decode())<self.sogliaMin:
+					futureState = 3
+				else: futureState = 0
+			elif self.currentState == 3:
+				self.ser.write(b'A1')
+				futureState = 0
+			self.currentState = futureState
 		elif msg.topic == self.zona + '/' + self.id + '/' + "LvLsensor_1":
 			if float(msg.payload.decode())<15:
 					self.ser.write(b'A2')
