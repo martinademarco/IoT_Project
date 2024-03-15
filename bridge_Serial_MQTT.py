@@ -56,7 +56,7 @@ class Bridge():
 
 
 	def setupMQTT(self):
-		self.clientMQTT = mqtt.Client()
+		self.clientMQTT = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
 		self.clientMQTT.on_connect = self.on_connect
 		self.clientMQTT.on_message = self.on_message
 		print("connecting to MQTT broker...")
