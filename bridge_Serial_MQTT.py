@@ -67,7 +67,7 @@ class Bridge():
 		self.clientMQTT.loop_start()
 
 
-	def on_connect(self, client, userdata, flags, rc):
+	def on_connect(self, client, userdata, flags, rc, properties):
 		print("Connected with result code " + str(rc))
 
 		# Subscribing in on_connect() means that if we lose the connection and
