@@ -1,4 +1,5 @@
 # Ignore virtual environment directory
 IoT/
 __pycache__/
+iot_project/
 IOT_proj/
