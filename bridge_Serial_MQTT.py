@@ -118,7 +118,7 @@ class Bridge():
 			zona, id, name = msg.topic.split('/')
 			if self.id != id:
 				self.datiZona[id] = value
-		hostname = socket.gethostname()    
+		hostname = socket.gethostname()
 		IPAddr = socket.gethostbyname(hostname)
 		url = IPAddr + "/newdata" + f"/{msg.topic}" + f"/{msg.payload.decode()}"
 		try:
@@ -149,8 +149,6 @@ class Bridge():
 		numval = int(self.buffer[1].decode()) # legge size del pacchetto
 		val = ''
 		for i in range (numval):
-			if numval - i == 2:
-				val = val + '.'
 			val = val + self.buffer[i+2].decode() # legge valore del pacchetto
 		#print(val)
 		sensor_name = ''
@@ -158,5 +156,7 @@ class Bridge():
 		sensorLen = len(self.buffer) - (SoN)
 		for j in range (sensorLen):
 			sensor_name = sensor_name + str(self.buffer[j + SoN].decode())
-		self.clientMQTT.publish(self.zona + '/' + self.id + '/' + sensor_name, val)
+		print(self.zona + '/' + self.id + '/' + sensor_name)
+		check = self.clientMQTT.publish(self.zona + '/' + self.id + '/' + sensor_name, val).is_published()
+  		print(check)
 		self.clientMQTT.on_message
