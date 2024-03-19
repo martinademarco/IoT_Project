@@ -39,9 +39,9 @@ class Bridge():
 				# se l'self è stato trovato aggiungi il suo id al dizionario con il buffer associato, esci dal ciclo
 				size_zona = int(self.ser.read().decode())
 				self.zona = self.ser.read(size_zona).decode()
-				#size_id = int(self.ser.read().decode())
-				self.id = self.ser.read(3).decode()
-				print(self.zona, self.id)
+				size_id = int(self.ser.read().decode())
+				self.id = self.ser.read(size_id).decode()
+				print(f'Arduino number: {self.id} of length {size_id} and zone: {self.zona} of length {size_zona}')
 				self.portName = port.device
 				return True
 			else:

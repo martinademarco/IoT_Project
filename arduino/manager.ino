@@ -48,7 +48,7 @@ void loop() {
       char start = Serial.read();
       if (start == SoL){
         Serial.print(EoL); //connessione al bridge
-        char zona = "zona_1";
+        char zona[] = "zona_1";
         int zona_size = strlen(zona);
         char id[] = "001";
         int id_size = strlen(id);
