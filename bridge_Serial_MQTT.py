@@ -158,5 +158,5 @@ class Bridge():
 			sensor_name = sensor_name + str(self.buffer[j + SoN].decode())
 		print(self.zona + '/' + self.id + '/' + sensor_name)
 		check = self.clientMQTT.publish(self.zona + '/' + self.id + '/' + sensor_name, val).is_published()
-  		print(check)
+		print(check)
 		self.clientMQTT.on_message
