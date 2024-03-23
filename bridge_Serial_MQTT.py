@@ -122,6 +122,7 @@ class Bridge():
 		hostname = socket.gethostname()
 		IPAddr = socket.gethostbyname(hostname)
 		url = IPAddr + "/newdata" + f"/{msg.topic}" + f"/{msg.payload.decode()}"
+		print(url)
 		try:
 			requests.post(url)
 		except requests.exceptions.RequestException as e:
@@ -157,7 +158,6 @@ class Bridge():
 		sensorLen = len(self.buffer) - (SoN)
 		for j in range (sensorLen):
 			sensor_name = sensor_name + str(self.buffer[j + SoN].decode())
-		print(self.zona + '/' + self.id + '/' + sensor_name)
 		check = self.clientMQTT.publish(self.zona + '/' + self.id + '/' + sensor_name, val).is_published()
 		print(check)
 		self.clientMQTT.on_message
