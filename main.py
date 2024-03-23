@@ -86,7 +86,7 @@ def addinlista(sensor, id, type, value):
         description: List
     """
     write_api = client.write_api(write_options=SYNCHRONOUS)
-    measure = influxdb_client.Point(sensor + id).tag("sensor", type).field("value", float(value))
+    measure = influxdb_client.Point("new_measurement").tag("sensor", type).field("value", float(value))
     write_api.write(bucket=config.get("InfluxDBClient","Bucket"), org=config.get("InfluxDBClient","Org"), record=measure)
     return "Data added"
 
