@@ -121,7 +121,8 @@ class Bridge():
 				self.datiZona[id] = value
 		hostname = socket.gethostname()
 		IPAddr = socket.gethostbyname(hostname)
-		url = IPAddr + "/newdata" + f"/{msg.topic}" + f"/{msg.payload.decode()}"
+		url = "http://"+IPAddr + "/newdata" + f"/{msg.topic}" + f"/{msg.payload.decode()}"
+		#url = IPAddr + "/newdata" + f"/{msg.topic}" + f"/{msg.payload.decode()}"
 		print(url)
 		try:
 			requests.post(url)
