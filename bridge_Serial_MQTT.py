@@ -88,7 +88,7 @@ class Bridge():
 		elif msg.topic == self.zona + '/' + self.id + '/' + "Tsensor_0":
 			dati = list(self.datiZona.values())
 			if len(dati) != 0: media = sum(dati) / len(dati)
-			else: media = msg.payload.decode() 
+			else: media = float(msg.payload.decode()) 
 			futureState = None
 			if self.currentState == 0:
 				if float(msg.payload.decode())>media+1:
@@ -115,7 +115,7 @@ class Bridge():
 			else:
 				self.ser.write(b'S2')
 		elif 'Tsensor_0' in msg.topic:
-			value = msg.payload.decode()
+			value = float(msg.payload.decode())
 			zona, id, name = msg.topic.split('/')
 			if self.id != id:
 				self.datiZona[id] = value
