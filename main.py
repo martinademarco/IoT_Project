@@ -17,7 +17,7 @@ app = Flask(appname)
 config = configparser.ConfigParser()
 config.read('config.ini')
 client = influxdb_client.InfluxDBClient(url=config.get("InfluxDBClient","Url"),
-   token=config.get("InfluxDBClient","Token_Chiara2"),
+   token=config.get("InfluxDBClient","Token"),
    org=config.get("InfluxDBClient","Org"))
 
 SWAGGER_URL = '/api/docs'  # URL for exposing Swagger UI (without trailing '/')
@@ -29,15 +29,23 @@ def page_not_found(error):
 
 @app.route('/')
 def testoHTML():
-    buckets_api = influxdb_client.BucketsApi(client)
+    query = f'from(bucket:"{config.get("InfluxDBClient","Bucket")}") |> range(start: -48h)'
+    tables = client.query_api().query(query)
 
-    # Query all buckets in the organization
-    buckets = buckets_api.find_buckets()
-
-    # Extract bucket names
-    bucket_names = [bucket.name for bucket in buckets.buckets]
+    # Process the query results
+    table = []
+    for tab in tables:
+        for row in tab.records:
+            # Access fields of each row
+            # time = row.values["001"]
+            # field1 = row.values["002"]
+            # Access tags if any
+            val = row.values["_field"]
+            if val not in table: table.append(row.values["_field"])
+            # Process data as needed
+            # print(f"Time: {time}, Field1: {field1}, Field2: {field2}, Tags: {tags}")
     
-    return render_template('main.html', devices=bucket_names)
+    return render_template('main.html', devices=table)
 
 
 @app.route('/lista/<sensor>', methods=['GET'])
@@ -78,6 +86,14 @@ def addinlista(sensor, id, type, value):
           description: arg
           required: true
         - in: path
+          name: id
+          description: arg
+          required: true
+        - in: path
+          name: type
+          description: arg
+          required: true
+        - in: path
           name: value
           description: integer
           required: true
@@ -86,7 +102,7 @@ def addinlista(sensor, id, type, value):
         description: List
     """
     write_api = client.write_api(write_options=SYNCHRONOUS)
-    measure = influxdb_client.Point("new_measurement").tag("sensor", type).field("value", float(value))
+    measure = influxdb_client.Point(sensor).tag("sensor", type).field(id, float(value))
     write_api.write(bucket=config.get("InfluxDBClient","Bucket"), org=config.get("InfluxDBClient","Org"), record=measure)
     return "Data added"
 
