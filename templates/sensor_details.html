@@ -1,0 +1,26 @@
+{% extends 'main.html' %}
+
+{% block content %}
+<canvas class="my-4 w-100" id="myChart" width="900" height="380"></canvas>
+<h2>Bowl's status</h2>
+<div class="table-responsive">
+    <table class="table table-striped table-sm">
+      <tr>
+        <th scope="col"></th>
+        <th scope="col">Value</th>
+        <th scope="col">Timestamp</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for el in lista %}
+      <tr>
+        <th scope="row"></th>
+        <td>{{el[0]}}</td>
+        <td>{{el[1]}}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+  
+{% endblock %}

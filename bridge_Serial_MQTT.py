@@ -39,9 +39,9 @@ class Bridge():
 				# se l'self è stato trovato aggiungi il suo id al dizionario con il buffer associato, esci dal ciclo
 				size_zona = int(self.ser.read().decode())
 				self.zona = self.ser.read(size_zona).decode()
-				#size_id = int(self.ser.read().decode())
-				self.id = self.ser.read(3).decode()
-				print(self.zona, self.id)
+				size_id = int(self.ser.read().decode())
+				self.id = self.ser.read(size_id).decode()
+				print(f'Arduino number: {self.id} of length {size_id} and zone: {self.zona} of length {size_zona}')
 				self.portName = port.device
 				return True
 			else:
@@ -56,7 +56,7 @@ class Bridge():
 
 
 	def setupMQTT(self):
-		self.clientMQTT = mqtt.Client()
+		self.clientMQTT = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
 		self.clientMQTT.on_connect = self.on_connect
 		self.clientMQTT.on_message = self.on_message
 		print("connecting to MQTT broker...")
@@ -67,7 +67,7 @@ class Bridge():
 		self.clientMQTT.loop_start()
 
 
-	def on_connect(self, client, userdata, flags, rc):
+	def on_connect(self, client, userdata, flags, rc, properties):
 		print("Connected with result code " + str(rc))
 
 		# Subscribing in on_connect() means that if we lose the connection and
@@ -87,7 +87,8 @@ class Bridge():
 				self.ser.write(b'S0')
 		elif msg.topic == self.zona + '/' + self.id + '/' + "Tsensor_0":
 			dati = list(self.datiZona.values())
-			media = sum(dati) / len(dati)
+			if len(dati) != 0: media = sum(dati) / len(dati)
+			else: media = float(msg.payload.decode()) 
 			futureState = None
 			if self.currentState == 0:
 				if float(msg.payload.decode())>media+1:
@@ -114,13 +115,15 @@ class Bridge():
 			else:
 				self.ser.write(b'S2')
 		elif 'Tsensor_0' in msg.topic:
-			value = msg.payload.decode()
+			value = float(msg.payload.decode())
 			zona, id, name = msg.topic.split('/')
 			if self.id != id:
 				self.datiZona[id] = value
-		hostname = socket.gethostname()    
+		hostname = socket.gethostname()
 		IPAddr = socket.gethostbyname(hostname)
-		url = IPAddr + "/newdata" + f"/{msg.topic}" + f"/{msg.payload.decode()}"
+		url = "http://"+IPAddr + "/newdata" + f"/{msg.topic}" + f"/{msg.payload.decode()}"
+		#url = IPAddr + "/newdata" + f"/{msg.topic}" + f"/{msg.payload.decode()}"
+		print(url)
 		try:
 			requests.post(url)
 		except requests.exceptions.RequestException as e:
@@ -149,8 +152,6 @@ class Bridge():
 		numval = int(self.buffer[1].decode()) # legge size del pacchetto
 		val = ''
 		for i in range (numval):
-			if numval - i == 2:
-				val = val + '.'
 			val = val + self.buffer[i+2].decode() # legge valore del pacchetto
 		#print(val)
 		sensor_name = ''
@@ -158,5 +159,6 @@ class Bridge():
 		sensorLen = len(self.buffer) - (SoN)
 		for j in range (sensorLen):
 			sensor_name = sensor_name + str(self.buffer[j + SoN].decode())
-		self.clientMQTT.publish(self.zona + '/' + self.id + '/' + sensor_name, val)
+		check = self.clientMQTT.publish(self.zona + '/' + self.id + '/' + sensor_name, val).is_published()
+		print(check)
 		self.clientMQTT.on_message
